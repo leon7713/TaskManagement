@@ -21,6 +21,7 @@ All fields include comprehensive validation to ensure data integrity.
 - **Database**: SQL Server (LocalDB)
 - **Pattern**: Repository pattern with DTO mapping
 - **Validation**: Data annotations with model validation
+- **Auto-Setup**: Automatic database creation and migration on startup
 
 ### Frontend (React + TypeScript)
 - **Framework**: React 18 with TypeScript
@@ -83,14 +84,13 @@ dotnet restore
 # Update database connection string in appsettings.json if needed
 # Default: Server=(localdb)\\mssqllocaldb;Database=TaskManagementDb
 
-# Apply database migrations
-dotnet ef database update
-
-# Run the API
+# Run the API (database will be created automatically on first run)
 dotnet run
 ```
 
 The API will start at `https://localhost:7123` (or check console output for the actual port).
+
+**Database Auto-Setup**: The application automatically creates and migrates the database on startup. No manual migration commands needed!
 
 **Swagger UI** will be available at: `https://localhost:7123/swagger`
 
@@ -218,9 +218,10 @@ npm test -- --coverage
 ### Common Issues
 
 1. **Database Connection Error**
-   - Ensure SQL Server LocalDB is installed
-   - Check connection string in `appsettings.json`
-   - Run `dotnet ef database update` again
+- Ensure SQL Server LocalDB is installed
+- Check connection string in `appsettings.json`
+- The database is created automatically on first run
+- If issues persist, check logs in console output
 
 2. **CORS Error in Frontend**
    - Verify backend API is running
@@ -349,7 +350,6 @@ For questions or issues, please refer to the project documentation or contact th
 # Backend
 cd Backend/TaskManagement.API
 dotnet restore
-dotnet ef database update
 dotnet run
 
 # Frontend (new terminal)
@@ -362,4 +362,4 @@ Backend API: https://localhost:7123/swagger
 Frontend: http://localhost:3000
 ```
 
-**Note**: Make sure both backend and frontend are running simultaneously for the application to work properly.
+**Note**: The database is created automatically on first run. Make sure both backend and frontend are running simultaneously for the application to work properly.
