@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using TaskManagement.API.Data;
 using TaskManagement.API.DTOs;
-using TaskManagement.API.Models;
+using TaskManagement.API.Interfaces;
 
 namespace TaskManagement.API.Controllers
 {
@@ -10,12 +8,12 @@ namespace TaskManagement.API.Controllers
     [Route("api/[controller]")]
     public class TasksController : ControllerBase
     {
-        private readonly TaskManagementDbContext _context;
+        private readonly ITaskService _taskService;
         private readonly ILogger<TasksController> _logger;
 
-        public TasksController(TaskManagementDbContext context, ILogger<TasksController> logger)
+        public TasksController(ITaskService taskService, ILogger<TasksController> logger)
         {
-            _context = context;
+            _taskService = taskService;
             _logger = logger;
         }
 
@@ -25,12 +23,8 @@ namespace TaskManagement.API.Controllers
         {
             try
             {
-                var tasks = await _context.Tasks
-                    .OrderByDescending(t => t.CreatedAt)
-                    .ToListAsync();
-
-                var taskDtos = tasks.Select(t => MapToResponseDto(t)).ToList();
-                return Ok(taskDtos);
+                var tasks = await _taskService.GetAllTasksAsync();
+                return Ok(tasks);
             }
             catch (Exception ex)
             {
@@ -45,14 +39,14 @@ namespace TaskManagement.API.Controllers
         {
             try
             {
-                var task = await _context.Tasks.FindAsync(id);
+                var task = await _taskService.GetTaskByIdAsync(id);
 
                 if (task == null)
                 {
                     return NotFound($"Task with ID {id} not found");
                 }
 
-                return Ok(MapToResponseDto(task));
+                return Ok(task);
             }
             catch (Exception ex)
             {
@@ -72,24 +66,12 @@ namespace TaskManagement.API.Controllers
                     return BadRequest(ModelState);
                 }
 
-                var task = new TaskItem
-                {
-                    Title = createTaskDto.Title,
-                    Description = createTaskDto.Description,
-                    DueDate = createTaskDto.DueDate,
-                    Priority = createTaskDto.Priority,
-                    FullName = createTaskDto.FullName,
-                    Telephone = createTaskDto.Telephone,
-                    Email = createTaskDto.Email,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                _context.Tasks.Add(task);
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation("Task created with ID {TaskId}", task.Id);
-
-                return CreatedAtAction(nameof(GetTask), new { id = task.Id }, MapToResponseDto(task));
+                var task = await _taskService.CreateTaskAsync(createTaskDto);
+                return CreatedAtAction(nameof(GetTask), new { id = task.Id }, task);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {
@@ -109,33 +91,17 @@ namespace TaskManagement.API.Controllers
                     return BadRequest(ModelState);
                 }
 
-                var task = await _context.Tasks.FindAsync(id);
+                var task = await _taskService.UpdateTaskAsync(id, updateTaskDto);
                 if (task == null)
                 {
                     return NotFound($"Task with ID {id} not found");
                 }
 
-                task.Title = updateTaskDto.Title;
-                task.Description = updateTaskDto.Description;
-                task.DueDate = updateTaskDto.DueDate;
-                task.Priority = updateTaskDto.Priority;
-                task.FullName = updateTaskDto.FullName;
-                task.Telephone = updateTaskDto.Telephone;
-                task.Email = updateTaskDto.Email;
-                task.IsCompleted = updateTaskDto.IsCompleted;
-                task.UpdatedAt = DateTime.UtcNow;
-
-                _context.Entry(task).State = EntityState.Modified;
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation("Task with ID {TaskId} updated", id);
-
                 return NoContent();
             }
-            catch (DbUpdateConcurrencyException ex)
+            catch (InvalidOperationException ex)
             {
-                _logger.LogError(ex, "Concurrency error occurred while updating task with ID {TaskId}", id);
-                return StatusCode(409, "The task was modified by another user. Please refresh and try again.");
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {
@@ -150,16 +116,11 @@ namespace TaskManagement.API.Controllers
         {
             try
             {
-                var task = await _context.Tasks.FindAsync(id);
-                if (task == null)
+                var result = await _taskService.DeleteTaskAsync(id);
+                if (!result)
                 {
                     return NotFound($"Task with ID {id} not found");
                 }
-
-                _context.Tasks.Remove(task);
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation("Task with ID {TaskId} deleted", id);
 
                 return NoContent();
             }
@@ -176,38 +137,14 @@ namespace TaskManagement.API.Controllers
         {
             try
             {
-                var tasks = await _context.Tasks
-                    .Where(t => t.DueDate < DateTime.UtcNow && !t.IsCompleted)
-                    .OrderBy(t => t.DueDate)
-                    .ToListAsync();
-
-                var taskDtos = tasks.Select(t => MapToResponseDto(t)).ToList();
-                return Ok(taskDtos);
+                var tasks = await _taskService.GetOverdueTasksAsync();
+                return Ok(tasks);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error occurred while retrieving overdue tasks");
                 return StatusCode(500, "An error occurred while retrieving overdue tasks");
             }
-        }
-
-        private static TaskResponseDto MapToResponseDto(TaskItem task)
-        {
-            return new TaskResponseDto
-            {
-                Id = task.Id,
-                Title = task.Title,
-                Description = task.Description,
-                DueDate = task.DueDate,
-                Priority = task.Priority,
-                FullName = task.FullName,
-                Telephone = task.Telephone,
-                Email = task.Email,
-                CreatedAt = task.CreatedAt,
-                UpdatedAt = task.UpdatedAt,
-                IsOverdue = task.IsOverdue,
-                IsCompleted = task.IsCompleted
-            };
         }
     }
 }

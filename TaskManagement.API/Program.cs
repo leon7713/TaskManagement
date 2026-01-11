@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using TaskManagement.API.Data;
+using TaskManagement.API.Interfaces;
+using TaskManagement.API.Repositories;
+using TaskManagement.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +20,10 @@ if (builder.Environment.EnvironmentName != "Testing")
     builder.Services.AddDbContext<TaskManagementDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 }
+
+// Register Repository and Service layers
+builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<ITaskService, TaskService>();
 
 // Add CORS
 builder.Services.AddCors(options =>
