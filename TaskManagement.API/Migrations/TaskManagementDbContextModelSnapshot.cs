@@ -59,6 +59,11 @@ namespace TaskManagement.API.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("int");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("Telephone")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -81,6 +86,51 @@ namespace TaskManagement.API.Migrations
                     b.HasIndex("IsCompleted");
 
                     b.ToTable("Tasks");
+                });
+
+            modelBuilder.Entity("TaskManagement.API.Models.TaskReminder", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("TaskId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SentAt");
+
+                    b.HasIndex("TaskId");
+
+                    b.HasIndex("TaskId", "SentAt");
+
+                    b.ToTable("TaskReminders");
+                });
+
+            modelBuilder.Entity("TaskManagement.API.Models.TaskReminder", b =>
+                {
+                    b.HasOne("TaskManagement.API.Models.TaskItem", "Task")
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Task");
                 });
 #pragma warning restore 612, 618
         }

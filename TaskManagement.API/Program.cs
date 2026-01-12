@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TaskManagement.API.Configuration;
 using TaskManagement.API.Data;
 using TaskManagement.API.Interfaces;
 using TaskManagement.API.Repositories;
@@ -20,6 +21,13 @@ if (builder.Environment.EnvironmentName != "Testing")
     builder.Services.AddDbContext<TaskManagementDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 }
+
+// Configure RabbitMQ settings
+var rabbitMQSettings = builder.Configuration.GetSection("RabbitMQ").Get<RabbitMQSettings>() ?? new RabbitMQSettings();
+builder.Services.AddSingleton(rabbitMQSettings);
+
+// Register RabbitMQ service as singleton
+builder.Services.AddSingleton<IRabbitMQService, RabbitMQService>();
 
 // Register Repository and Service layers
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();

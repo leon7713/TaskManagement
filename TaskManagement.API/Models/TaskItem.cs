@@ -39,8 +39,12 @@ namespace TaskManagement.API.Models
 
         public DateTime? UpdatedAt { get; set; }
 
-        public bool IsOverdue => DueDate < DateTime.UtcNow && !IsCompleted;
+    public bool IsOverdue => DueDate < DateTime.UtcNow && !IsCompleted;
 
-        public bool IsCompleted { get; set; } = false;
-    }
+    public bool IsCompleted { get; set; } = false;
+
+    // Concurrency token for optimistic concurrency control
+    [Timestamp]
+    public byte[]? RowVersion { get; set; }
+}
 }

@@ -8,11 +8,13 @@ namespace TaskManagement.API.Services
     {
         private readonly ITaskRepository _repository;
         private readonly ILogger<TaskService> _logger;
+        private readonly IRabbitMQService _rabbitMQService;
 
-        public TaskService(ITaskRepository repository, ILogger<TaskService> logger)
+        public TaskService(ITaskRepository repository, ILogger<TaskService> logger, IRabbitMQService rabbitMQService)
         {
             _repository = repository;
             _logger = logger;
+            _rabbitMQService = rabbitMQService;
         }
 
         public async Task<IEnumerable<TaskResponseDto>> GetAllTasksAsync()
@@ -53,6 +55,9 @@ namespace TaskManagement.API.Services
             var createdTask = await _repository.CreateTaskAsync(task);
             _logger.LogInformation("Task created with ID {TaskId}", createdTask.Id);
             
+            // Publish task created event to RabbitMQ
+            PublishTaskEvent(createdTask, "Created");
+            
             return MapToResponseDto(createdTask);
         }
 
@@ -63,6 +68,7 @@ namespace TaskManagement.API.Services
                 return null;
 
             // Allow updating overdue tasks - no due date validation on updates
+            var wasCompleted = task.IsCompleted;
 
             task.Title = updateTaskDto.Title;
             task.Description = updateTaskDto.Description;
@@ -77,19 +83,57 @@ namespace TaskManagement.API.Services
             var updatedTask = await _repository.UpdateTaskAsync(task);
             _logger.LogInformation("Task with ID {TaskId} updated", id);
             
+            // Publish appropriate event based on completion status change
+            var eventType = !wasCompleted && updateTaskDto.IsCompleted ? "Completed" : "Updated";
+            PublishTaskEvent(updatedTask, eventType);
+            
             return MapToResponseDto(updatedTask);
         }
 
         public async Task<bool> DeleteTaskAsync(int id)
         {
+            var task = await _repository.GetTaskByIdAsync(id);
             var result = await _repository.DeleteTaskAsync(id);
+            
             if (result)
+            {
                 _logger.LogInformation("Task with ID {TaskId} deleted", id);
+                
+                // Publish task deleted event to RabbitMQ
+                if (task != null)
+                {
+                    PublishTaskEvent(task, "Deleted");
+                }
+            }
             
             return result;
         }
 
         // Private helper methods
+        private void PublishTaskEvent(TaskItem task, string eventType)
+        {
+            try
+            {
+                var message = new TaskEventMessage
+                {
+                    TaskId = task.Id,
+                    EventType = eventType,
+                    Title = task.Title,
+                    Description = task.Description,
+                    DueDate = task.DueDate,
+                    IsCompleted = task.IsCompleted,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                _rabbitMQService.PublishTaskEvent(message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to publish {EventType} event for task {TaskId}", eventType, task.Id);
+                // Don't throw - we don't want message publishing failures to break the API
+            }
+        }
+
         private static void ValidateTaskDueDate(DateTime dueDate)
         {
             if (dueDate < DateTime.UtcNow.AddHours(-1)) // Allow 1 hour grace period

@@ -11,6 +11,8 @@ namespace TaskManagement.API.Data
         }
 
         public DbSet<TaskItem> Tasks { get; set; }
+        
+        public DbSet<TaskReminder> TaskReminders { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -28,10 +30,30 @@ namespace TaskManagement.API.Data
                 entity.Property(e => e.Email).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.IsCompleted).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.RowVersion).IsRowVersion();
 
                 entity.HasIndex(e => e.DueDate);
                 entity.HasIndex(e => e.Email);
                 entity.HasIndex(e => e.IsCompleted);
+            });
+
+            modelBuilder.Entity<TaskReminder>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.TaskId).IsRequired();
+                entity.Property(e => e.SentAt).IsRequired();
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Notes).HasMaxLength(500);
+
+                entity.HasIndex(e => e.TaskId);
+                entity.HasIndex(e => e.SentAt);
+                entity.HasIndex(e => new { e.TaskId, e.SentAt });
+
+                // Configure relationship
+                entity.HasOne(e => e.Task)
+                    .WithMany()
+                    .HasForeignKey(e => e.TaskId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }
